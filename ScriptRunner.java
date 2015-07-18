@@ -130,6 +130,9 @@ public class ScriptRunner {
                 } else if (trimmedLine.length() < 1
                         || trimmedLine.startsWith("--")) {
                     // Do nothing
+                } else if (trimmedLine.toLowerCase().startsWith("delimiter ")) {
+                    int delimiterPos = line.toLowerCase().indexOf("delimiter ") + "delimiter ".length();
+                    setDelimiter(line.substring(delimiterPos).trim(), false);
                 } else if (!fullLineDelimiter
                         && trimmedLine.endsWith(getDelimiter())
                         || fullLineDelimiter
@@ -185,7 +188,7 @@ public class ScriptRunner {
                     Thread.yield();
                 } else {
                     command.append(line);
-                    command.append(" ");
+                    command.append("\n");
                 }
             }
             if (!autoCommit) {
