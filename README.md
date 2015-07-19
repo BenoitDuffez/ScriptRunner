@@ -16,17 +16,19 @@ drop procedure if exists RecordStep;
 
 delimiter $$
 
-create procedure RecordStep(step varchar (50))
-begin
-        select 1000*(sysdate(6) - @now), 0 + sysdate(6) into @diff, @now;
-        insert into bicou_gtfs.timetracker (query_id, date_added, step, duration)
-        values (@queryId, now(), step, @diff);
-end$$
+CREATE PROCEDURE `p2` (in txt varchar(100))
+LANGUAGE SQL
+DETERMINISTIC
+SQL SECURITY DEFINER
+COMMENT 'A procedure'
+BEGIN
+    SELECT concat('Hello World: ', txt);
+END$$
 
 delimiter ;
 
-call RecordStep("test");
-call RecordStep("this will work too");
+call p2("test");
+call p("this will work too");
 ```
 
 # Usage
@@ -40,9 +42,10 @@ try {
 } catch (ClassNotFoundException e) {
     System.err.println("Unable to get mysql driver: " + e);
 } catch (SQLException e) {
-    System.err.println("Unable to connect to server", e);
+    System.err.println("Unable to connect to server: " + e);
 }
 ScriptRunner runner = new ScriptRunner(mConnection, false, false);
 String file = "~/path/to/script.sql";
 runner.runScript(new BufferedReader(new FileReader(file)));
 ```
+
