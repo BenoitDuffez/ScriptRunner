@@ -1,8 +1,8 @@
-package io.tachy.db;
 /*
  * Slightly modified version of the com.ibatis.common.jdbc.ScriptRunner class
  * from the iBATIS Apache project. Only removed dependency on Resource class
  * and a constructor 
+ * GPSHansl, 06.08.2015: regex for delimiter, rearrange comment/delimiter detection, remove some ide warnings.
  */
 /*
  *  Copyright 2004 Clinton Begin
@@ -19,12 +19,19 @@ package io.tachy.db;
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+package io.tachy.db;
 
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.PrintWriter;
 import java.io.Reader;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Tool to run database scripts
@@ -32,13 +39,20 @@ import java.sql.*;
 public class ScriptRunner {
 
     private static final String DEFAULT_DELIMITER = ";";
+    /**
+     * regex to detect delimiter.
+     * ignores spaces, allows delimiter in comment, allows an equals-sign
+     */
+    public static final Pattern delimP = Pattern.compile("^\\s*(--)?\\s*delimiter\\s*=?\\s*([^\\s]+)+\\s*.*$", Pattern.CASE_INSENSITIVE);
 
-    private Connection connection;
+    private final Connection connection;
 
-    private boolean stopOnError;
-    private boolean autoCommit;
+    private final boolean stopOnError;
+    private final boolean autoCommit;
 
+    @SuppressWarnings("UseOfSystemOutOrSystemErr")
     private PrintWriter logWriter = new PrintWriter(System.out);
+    @SuppressWarnings("UseOfSystemOutOrSystemErr")
     private PrintWriter errorLogWriter = new PrintWriter(System.err);
 
     private String delimiter = DEFAULT_DELIMITER;
@@ -48,7 +62,7 @@ public class ScriptRunner {
      * Default constructor
      */
     public ScriptRunner(Connection connection, boolean autoCommit,
-                        boolean stopOnError) {
+            boolean stopOnError) {
         this.connection = connection;
         this.autoCommit = autoCommit;
         this.stopOnError = stopOnError;
@@ -93,9 +107,7 @@ public class ScriptRunner {
             } finally {
                 connection.setAutoCommit(originalAutoCommit);
             }
-        } catch (IOException e) {
-            throw e;
-        } catch (SQLException e) {
+        } catch (IOException | SQLException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("Error running script.  Cause: " + e, e);
@@ -106,33 +118,33 @@ public class ScriptRunner {
      * Runs an SQL script (read in using the Reader parameter) using the
      * connection passed in
      *
-     * @param conn   - the connection to use for the script
+     * @param conn - the connection to use for the script
      * @param reader - the source of the script
      * @throws SQLException if any SQL errors occur
-     * @throws IOException  if there is an error reading from the Reader
+     * @throws IOException if there is an error reading from the Reader
      */
     private void runScript(Connection conn, Reader reader) throws IOException,
             SQLException {
         StringBuffer command = null;
         try {
             LineNumberReader lineReader = new LineNumberReader(reader);
-            String line = null;
+            String line;
             while ((line = lineReader.readLine()) != null) {
                 if (command == null) {
                     command = new StringBuffer();
                 }
                 String trimmedLine = line.trim();
-                if (trimmedLine.startsWith("--")) {
-                    println(trimmedLine);
-                } else if (trimmedLine.length() < 1
+                final Matcher delimMatch = delimP.matcher(trimmedLine);
+                if (trimmedLine.length() < 1
                         || trimmedLine.startsWith("//")) {
                     // Do nothing
+                } else if (delimMatch.matches()) {
+                    setDelimiter(delimMatch.group(2), false);
+                } else if (trimmedLine.startsWith("--")) {
+                    println(trimmedLine);
                 } else if (trimmedLine.length() < 1
                         || trimmedLine.startsWith("--")) {
                     // Do nothing
-                } else if (trimmedLine.toLowerCase().startsWith("delimiter ")) {
-                    int delimiterPos = line.toLowerCase().indexOf("delimiter ") + "delimiter ".length();
-                    setDelimiter(line.substring(delimiterPos).trim(), false);
                 } else if (!fullLineDelimiter
                         && trimmedLine.endsWith(getDelimiter())
                         || fullLineDelimiter
@@ -145,15 +157,14 @@ public class ScriptRunner {
                     println(command);
 
                     boolean hasResults = false;
-                    if (stopOnError) {
+                    try {
                         hasResults = statement.execute(command.toString());
-                    } else {
-                        try {
-                            statement.execute(command.toString());
-                        } catch (SQLException e) {
-                            e.fillInStackTrace();
-                            printlnError("Error executing: " + command);
-                            printlnError(e);
+                    } catch (SQLException e) {
+                        final String errText = String.format("Error executing '%s' (line %d): %s", command, lineReader.getLineNumber(), e.getMessage());
+                        if (stopOnError) {
+                            throw new SQLException(errText, e);
+                        } else {
+                            println(errText);
                         }
                     }
 
@@ -185,7 +196,6 @@ public class ScriptRunner {
                     } catch (Exception e) {
                         // Ignore to workaround a bug in Jakarta DBCP
                     }
-                    Thread.yield();
                 } else {
                     command.append(line);
                     command.append("\n");
@@ -194,16 +204,8 @@ public class ScriptRunner {
             if (!autoCommit) {
                 conn.commit();
             }
-        } catch (SQLException e) {
-            e.fillInStackTrace();
-            printlnError("Error executing: " + command);
-            printlnError(e);
-            throw e;
-        } catch (IOException e) {
-            e.fillInStackTrace();
-            printlnError("Error executing: " + command);
-            printlnError(e);
-            throw e;
+        } catch (Exception e) {
+            throw new IOException(String.format("Error executing '%s': %s", command, e.getMessage()), e);
         } finally {
             conn.rollback();
             flush();
@@ -214,6 +216,7 @@ public class ScriptRunner {
         return delimiter;
     }
 
+    @SuppressWarnings("UseOfSystemOutOrSystemErr")
     private void print(Object o) {
         if (logWriter != null) {
             System.out.print(o);
@@ -241,4 +244,3 @@ public class ScriptRunner {
         }
     }
 }
-
