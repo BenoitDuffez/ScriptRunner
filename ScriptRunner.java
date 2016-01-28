@@ -151,54 +151,15 @@ public class ScriptRunner {
                     command.append(line.substring(0, line
                             .lastIndexOf(getDelimiter())));
                     command.append(" ");
-                    Statement statement = conn.createStatement();
-
-                    println(command);
-
-                    boolean hasResults = false;
-                    try {
-                        hasResults = statement.execute(command.toString());
-                    } catch (SQLException e) {
-                        final String errText = String.format("Error executing '%s' (line %d): %s", command, lineReader.getLineNumber(), e.getMessage());
-                        if (stopOnError) {
-                            throw new SQLException(errText, e);
-                        } else {
-                            println(errText);
-                        }
-                    }
-
-                    if (autoCommit && !conn.getAutoCommit()) {
-                        conn.commit();
-                    }
-
-                    ResultSet rs = statement.getResultSet();
-                    if (hasResults && rs != null) {
-                        ResultSetMetaData md = rs.getMetaData();
-                        int cols = md.getColumnCount();
-                        for (int i = 0; i < cols; i++) {
-                            String name = md.getColumnLabel(i);
-                            print(name + "\t");
-                        }
-                        println("");
-                        while (rs.next()) {
-                            for (int i = 0; i < cols; i++) {
-                                String value = rs.getString(i);
-                                print(value + "\t");
-                            }
-                            println("");
-                        }
-                    }
-
+                    this.execCommand(conn, command, lineReader);
                     command = null;
-                    try {
-                        statement.close();
-                    } catch (Exception e) {
-                        // Ignore to workaround a bug in Jakarta DBCP
-                    }
                 } else {
                     command.append(line);
                     command.append("\n");
                 }
+            }
+            if (command != null) {
+            	this.execCommand(conn, command, lineReader);
             }
             if (!autoCommit) {
                 conn.commit();
@@ -210,6 +171,53 @@ public class ScriptRunner {
             flush();
         }
     }
+
+	private void execCommand(Connection conn, StringBuffer command,
+			LineNumberReader lineReader) throws SQLException {
+		Statement statement = conn.createStatement();
+
+		println(command);
+
+		boolean hasResults = false;
+		try {
+		    hasResults = statement.execute(command.toString());
+		} catch (SQLException e) {
+		    final String errText = String.format("Error executing '%s' (line %d): %s", command, lineReader.getLineNumber(), e.getMessage());
+		    if (stopOnError) {
+		        throw new SQLException(errText, e);
+		    } else {
+		        println(errText);
+		    }
+		}
+
+		if (autoCommit && !conn.getAutoCommit()) {
+		    conn.commit();
+		}
+
+		ResultSet rs = statement.getResultSet();
+		if (hasResults && rs != null) {
+		    ResultSetMetaData md = rs.getMetaData();
+		    int cols = md.getColumnCount();
+		    for (int i = 1; i <= cols; i++) {
+		        String name = md.getColumnLabel(i);
+		        print(name + "\t");
+		    }
+		    println("");
+		    while (rs.next()) {
+		        for (int i = 1; i <= cols; i++) {
+		            String value = rs.getString(i);
+		            print(value + "\t");
+		        }
+		        println("");
+		    }
+		}
+
+		try {
+		    statement.close();
+		} catch (Exception e) {
+		    // Ignore to workaround a bug in Jakarta DBCP
+		}
+	}
 
     private String getDelimiter() {
         return delimiter;
