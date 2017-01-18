@@ -1,9 +1,10 @@
 /*
  * Slightly modified version of the com.ibatis.common.jdbc.ScriptRunner class
  * from the iBATIS Apache project. Only removed dependency on Resource class
- * and a constructor 
+ * and a constructor
  * GPSHansl, 06.08.2015: regex for delimiter, rearrange comment/delimiter detection, remove some ide warnings.
  */
+
 /*
  *  Copyright 2004 Clinton Begin
  *
@@ -20,15 +21,9 @@
  *  limitations under the License.
  */
 
-import java.io.IOException;
-import java.io.LineNumberReader;
-import java.io.PrintWriter;
-import java.io.Reader;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.io.*;
+import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -50,9 +45,9 @@ public class ScriptRunner {
     private final boolean autoCommit;
 
     @SuppressWarnings("UseOfSystemOutOrSystemErr")
-    private PrintWriter logWriter = new PrintWriter(System.out);
+    private PrintWriter logWriter = null;
     @SuppressWarnings("UseOfSystemOutOrSystemErr")
-    private PrintWriter errorLogWriter = new PrintWriter(System.err);
+    private PrintWriter errorLogWriter = null;
 
     private String delimiter = DEFAULT_DELIMITER;
     private boolean fullLineDelimiter = false;
@@ -61,10 +56,33 @@ public class ScriptRunner {
      * Default constructor
      */
     public ScriptRunner(Connection connection, boolean autoCommit,
-            boolean stopOnError) {
+                        boolean stopOnError) {
         this.connection = connection;
         this.autoCommit = autoCommit;
         this.stopOnError = stopOnError;
+        File logFile = new File("create_db.log");
+        File errorLogFile = new File("create_db_error.log");
+        try {
+            if (logFile.exists()) {
+                logWriter = new PrintWriter(new FileWriter(logFile, true));
+            } else {
+                logWriter = new PrintWriter(new FileWriter(logFile, false));
+            }
+        } catch(IOException e){
+            System.err.println("Unable to access or create the db_create log");
+        }
+        try {
+            if (logFile.exists()) {
+                errorLogWriter = new PrintWriter(new FileWriter(errorLogFile, true));
+            } else {
+                errorLogWriter = new PrintWriter(new FileWriter(errorLogFile, false));
+            }
+        } catch(IOException e){
+            System.err.println("Unable to access or create the  db_create error log");
+        }
+        String timeStamp = new SimpleDateFormat("dd/mm/yyyy HH:mm:ss").format(new java.util.Date());
+        println("\n-------\n" + timeStamp + "\n-------\n");
+        printlnError("\n-------\n" + timeStamp + "\n-------\n");
     }
 
     public void setDelimiter(String delimiter, boolean fullLineDelimiter) {
@@ -159,12 +177,13 @@ public class ScriptRunner {
                 }
             }
             if (command != null) {
-            	this.execCommand(conn, command, lineReader);
+                this.execCommand(conn, command, lineReader);
             }
             if (!autoCommit) {
                 conn.commit();
             }
-        } catch (Exception e) {
+        }
+        catch (IOException e) {
             throw new IOException(String.format("Error executing '%s': %s", command, e.getMessage()), e);
         } finally {
             conn.rollback();
@@ -172,61 +191,63 @@ public class ScriptRunner {
         }
     }
 
-	private void execCommand(Connection conn, StringBuffer command,
-			LineNumberReader lineReader) throws SQLException {
-		Statement statement = conn.createStatement();
+    private void execCommand(Connection conn, StringBuffer command,
+                             LineNumberReader lineReader) throws SQLException {
+        Statement statement = conn.createStatement();
 
-		println(command);
+        println(command);
 
-		boolean hasResults = false;
-		try {
-		    hasResults = statement.execute(command.toString());
-		} catch (SQLException e) {
-		    final String errText = String.format("Error executing '%s' (line %d): %s", command, lineReader.getLineNumber(), e.getMessage());
-		    if (stopOnError) {
-		        throw new SQLException(errText, e);
-		    } else {
-		        println(errText);
-		    }
-		}
+        boolean hasResults = false;
+        try {
+            hasResults = statement.execute(command.toString());
+        } catch (SQLException e) {
+            final String errText = String.format("Error executing '%s' (line %d): %s",
+                    command, lineReader.getLineNumber(), e.getMessage());
+            printlnError(errText);
+            System.err.println(errText);
+            if (stopOnError) {
+                throw new SQLException(errText, e);
+            }
+        }
 
-		if (autoCommit && !conn.getAutoCommit()) {
-		    conn.commit();
-		}
+        if (autoCommit && !conn.getAutoCommit()) {
+            conn.commit();
+        }
 
-		ResultSet rs = statement.getResultSet();
-		if (hasResults && rs != null) {
-		    ResultSetMetaData md = rs.getMetaData();
-		    int cols = md.getColumnCount();
-		    for (int i = 1; i <= cols; i++) {
-		        String name = md.getColumnLabel(i);
-		        print(name + "\t");
-		    }
-		    println("");
-		    while (rs.next()) {
-		        for (int i = 1; i <= cols; i++) {
-		            String value = rs.getString(i);
-		            print(value + "\t");
-		        }
-		        println("");
-		    }
-		}
+        ResultSet rs = statement.getResultSet();
+        if (hasResults && rs != null) {
+            ResultSetMetaData md = rs.getMetaData();
+            int cols = md.getColumnCount();
+            for (int i = 1; i <= cols; i++) {
+                String name = md.getColumnLabel(i);
+                print(name + "\t");
+            }
+            println("");
+            while (rs.next()) {
+                for (int i = 1; i <= cols; i++) {
+                    String value = rs.getString(i);
+                    print(value + "\t");
+                }
+                println("");
+            }
+        }
 
-		try {
-		    statement.close();
-		} catch (Exception e) {
-		    // Ignore to workaround a bug in Jakarta DBCP
-		}
-	}
+        try {
+            statement.close();
+        } catch (Exception e) {
+            // Ignore to workaround a bug in Jakarta DBCP
+        }
+    }
 
     private String getDelimiter() {
         return delimiter;
     }
 
     @SuppressWarnings("UseOfSystemOutOrSystemErr")
+
     private void print(Object o) {
         if (logWriter != null) {
-            System.out.print(o);
+            logWriter.print(o);
         }
     }
 
