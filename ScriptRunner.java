@@ -72,13 +72,13 @@ public class ScriptRunner {
             System.err.println("Unable to access or create the db_create log");
         }
         try {
-            if (logFile.exists()) {
+            if (errorLogFile.exists()) {
                 errorLogWriter = new PrintWriter(new FileWriter(errorLogFile, true));
             } else {
                 errorLogWriter = new PrintWriter(new FileWriter(errorLogFile, false));
             }
         } catch(IOException e){
-            System.err.println("Unable to access or create the  db_create error log");
+            System.err.println("Unable to access or create the db_create error log");
         }
         String timeStamp = new SimpleDateFormat("dd/mm/yyyy HH:mm:ss").format(new java.util.Date());
         println("\n-------\n" + timeStamp + "\n-------\n");
