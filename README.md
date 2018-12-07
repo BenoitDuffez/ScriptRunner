@@ -7,6 +7,8 @@ Initial code was found using: http://stackoverflow.com/a/1044837/334493
 
 The initial code didn't allow custom delimiters (at least not dynamically) so it was not suited for procedure declarations.
 
+Possible alternative: http://www.mybatis.org/mybatis-3/getting-started.html (see #13)
+
 # Example
 
 Here is an example of a supported script:
