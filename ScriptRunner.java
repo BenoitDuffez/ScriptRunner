@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
 public class ScriptRunner {
 
     private static final String DEFAULT_DELIMITER = ";";
+    private static final Pattern SOURCE_COMMAND = Pattern.compile("^\\s*SOURCE\\s+(.*)\\s*$", Pattern.CASE_INSENSITIVE);
+
     /**
      * regex to detect delimiter.
      * ignores spaces, allows delimiter in comment, allows an equals-sign
@@ -51,6 +53,8 @@ public class ScriptRunner {
 
     private String delimiter = DEFAULT_DELIMITER;
     private boolean fullLineDelimiter = false;
+
+    private String userDirectory = System.getProperty("user.dir");
 
     /**
      * Default constructor
@@ -106,6 +110,23 @@ public class ScriptRunner {
      */
     public void setErrorLogWriter(PrintWriter errorLogWriter) {
         this.errorLogWriter = errorLogWriter;
+    }
+
+    /**
+     * Set the current working directory.  Source commands will be relative to this.
+     */
+    public void setUserDirectory(String userDirectory) {
+        this.userDirectory = userDirectory;
+    }
+
+    /**
+     * Runs an SQL script (read in using the Reader parameter)
+     *
+     * @param filepath - the filepath of the script to run. May be relative to the userDirectory.
+     */
+    public void runScript(String filepath) throws IOException, SQLException {
+        File file = new File(userDirectory, filepath);
+        this.runScript(new BufferedReader(new FileReader(file)));
     }
 
     /**
@@ -192,7 +213,29 @@ public class ScriptRunner {
     }
 
     private void execCommand(Connection conn, StringBuffer command,
+                             LineNumberReader lineReader) throws IOException, SQLException {
+
+        if (command.length() == 0) {
+            return;
+        }
+
+        Matcher sourceCommandMatcher = SOURCE_COMMAND.matcher(command);
+        if (sourceCommandMatcher.matches()) {
+            this.runScriptFile(conn, sourceCommandMatcher.group(1));
+            return;
+        }
+
+        this.execSqlCommand(conn, command, lineReader);
+    }
+
+    private void runScriptFile(Connection conn, String filepath) throws IOException, SQLException {
+        File file = new File(userDirectory, filepath);
+        this.runScript(conn, new BufferedReader(new FileReader(file)));
+    }
+
+    private void execSqlCommand(Connection conn, StringBuffer command,
                              LineNumberReader lineReader) throws SQLException {
+
         Statement statement = conn.createStatement();
 
         println(command);
