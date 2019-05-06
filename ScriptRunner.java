@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 public class ScriptRunner {
 
     private static final String DEFAULT_DELIMITER = ";";
-    private static final Pattern SOURCE_COMMAND = Pattern.compile("^\\s*SOURCE\\s+(.*)\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SOURCE_COMMAND = Pattern.compile("^\\s*SOURCE\\s+(.*?)\\s*$", Pattern.CASE_INSENSITIVE);
 
     /**
      * regex to detect delimiter.
