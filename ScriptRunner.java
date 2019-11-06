@@ -46,9 +46,9 @@ public class ScriptRunner {
     private final boolean stopOnError;
     private final boolean autoCommit;
 
-    @SuppressWarnings("UseOfSystemOutOrSystemErr")
+    //@SuppressWarnings("UseOfSystemOutOrSystemErr")
     private PrintWriter logWriter = null;
-    @SuppressWarnings("UseOfSystemOutOrSystemErr")
+    //@SuppressWarnings("UseOfSystemOutOrSystemErr")
     private PrintWriter errorLogWriter = null;
 
     private String delimiter = DEFAULT_DELIMITER;
@@ -164,6 +164,7 @@ public class ScriptRunner {
     private void runScript(Connection conn, Reader reader) throws IOException,
             SQLException {
         StringBuffer command = null;
+		String trimmedLine = null;
         try {
             LineNumberReader lineReader = new LineNumberReader(reader);
             String line;
@@ -171,7 +172,7 @@ public class ScriptRunner {
                 if (command == null) {
                     command = new StringBuffer();
                 }
-                String trimmedLine = line.trim();
+                trimmedLine = line.trim();
                 final Matcher delimMatch = delimP.matcher(trimmedLine);
                 if (trimmedLine.length() < 1
                         || trimmedLine.startsWith("//")) {
@@ -198,7 +199,12 @@ public class ScriptRunner {
                 }
             }
             if (command != null) {
-                this.execCommand(conn, command, lineReader);
+				if(command.toString().equals("")) {
+					//do nothing;
+				}
+				else{
+					this.execCommand(conn, command, lineReader);
+				}
             }
             if (!autoCommit) {
                 conn.commit();
@@ -286,7 +292,7 @@ public class ScriptRunner {
         return delimiter;
     }
 
-    @SuppressWarnings("UseOfSystemOutOrSystemErr")
+    //@SuppressWarnings("UseOfSystemOutOrSystemErr")
 
     private void print(Object o) {
         if (logWriter != null) {
